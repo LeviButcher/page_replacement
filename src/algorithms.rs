@@ -1,9 +1,5 @@
 use crate::*;
-use utils::add_if_not_found;
-
-/*
-* All algorithms should return back the page *number* to replace. Not the index.
-*/
+use utils::{add_if_not_found, push, remove_first};
 
 /// First In First Out Algorithm
 /// page_frames is the currently loaded pages in memory
@@ -15,16 +11,13 @@ use utils::add_if_not_found;
 /// Being selected again does not mean you entered the queue again
 /// For Example: [0, 1, 2, 0]
 ///     By FIFO '0' is still the very first to have entered the queue
-///
-pub fn fifo(page_frames: Vec<MemoryPage>, _page: MemoryPage, past_pages: Vec<u32>) -> u32 {
-    let length = page_frames.len();
-    let filter_pages: Vec<u32> = past_pages
-        .into_iter()
-        .fold(Vec::<u32>::new(), add_if_not_found);
-
-    *filter_pages.as_slice()[filter_pages.len() - length..]
-        .first()
-        .unwrap()
+/// Keep sort order of [Oldest -> Newest]
+pub fn fifo(
+    page_frames: Vec<MemoryPage>,
+    page: MemoryPage,
+    _past_pages: Vec<u32>,
+) -> Vec<MemoryPage> {
+    push(remove_first(page_frames), page)
 }
 
 /// Least Recently Used Algorithm
@@ -36,15 +29,57 @@ pub fn fifo(page_frames: Vec<MemoryPage>, _page: MemoryPage, past_pages: Vec<u32
 ///
 /// For Example: [0, 1, 2, 0]
 ///     By LRU: '1' is the oldest page in the queue
-///
-pub fn lru(page_frames: Vec<MemoryPage>, _page: MemoryPage, mut past_pages: Vec<u32>) -> u32 {
+/// No Sort Order
+pub fn lru(
+    page_frames: Vec<MemoryPage>,
+    page: MemoryPage,
+    mut past_pages: Vec<u32>,
+) -> Vec<MemoryPage> {
     let length = page_frames.len();
     past_pages.reverse();
     let filter_pages = past_pages
         .into_iter()
         .fold(Vec::<u32>::new(), add_if_not_found);
 
-    *filter_pages.get(length - 1).unwrap()
+    let replace_page_number = *filter_pages.get(length - 1).unwrap();
+
+    let page_frames = page_frames
+        .into_iter()
+        .filter(|x| x.number != replace_page_number)
+        .collect::<Vec<MemoryPage>>();
+    push(page_frames, page)
+}
+
+/// Second Chance Algorithm
+/// Exactly like FIFO and that it starts to replace the oldest page
+/// However, if the oldest has been referenced, then clear it, and look at the second oldest page
+/// Continue looking at the next oldest till you find one that has not been referenced and replace it
+/// Keep sort order of [Oldest -> Newest]
+pub fn second_chance(
+    page_frames: Vec<MemoryPage>,
+    page: MemoryPage,
+    mut _past_pages: Vec<u32>,
+) -> Vec<MemoryPage> {
+    recursive_second_chance(page_frames, page)
+}
+
+pub fn recursive_second_chance(
+    mut page_frames: Vec<MemoryPage>,
+    page: MemoryPage,
+) -> Vec<MemoryPage> {
+    let oldest_page = page_frames.get(0).unwrap();
+    // Base Case
+    if oldest_page.referenced == false {
+        // replace it
+        page_frames.remove(0);
+        page_frames.push(page);
+        return page_frames;
+    }
+
+    page_frames.push(oldest_page.clear());
+    page_frames.remove(0);
+
+    recursive_second_chance(page_frames, page)
 }
 
 #[cfg(test)]
@@ -61,31 +96,75 @@ mod test {
         ];
         let page = MemoryPage::new(4);
         let past_pages = vec![7, 0, 1, 2, 0, 3, 0];
-        let expected_page_number = 1;
+
+        let expected = vec![
+            MemoryPage::new(2),
+            MemoryPage::new(0),
+            MemoryPage::new(3),
+            MemoryPage::new(4),
+        ];
 
         let res = lru(page_frames, page, past_pages);
-        assert_eq!(res, expected_page_number);
+        assert_eq!(res, expected);
     }
 
     #[test]
     fn fifo_should_return_expected() {
         let page_frames = vec![MemoryPage::new(0), MemoryPage::new(3), MemoryPage::new(5)];
         let page = MemoryPage::new(6);
-        let past_pages = vec![1, 3, 0, 3, 5];
-        let expected_page_number = 3;
+        let past_pages = vec![];
+        let expected = vec![MemoryPage::new(3), MemoryPage::new(5), MemoryPage::new(6)];
 
         let res = fifo(page_frames, page, past_pages);
-        assert_eq!(res, expected_page_number);
+        assert_eq!(res, expected);
     }
 
     #[test]
-    fn fifo_case2_should_return_expected() {
+    fn second_chance_all_frame_no_second_chance_should_return_expected() {
         let page_frames = vec![MemoryPage::new(0), MemoryPage::new(1), MemoryPage::new(2)];
         let page = MemoryPage::new(3);
-        let past_pages = vec![0, 1, 2, 0];
-        let expected_page_number = 0;
+        let expected = vec![MemoryPage::new(1), MemoryPage::new(2), MemoryPage::new(3)];
 
-        let res = fifo(page_frames, page, past_pages);
-        assert_eq!(res, expected_page_number);
+        let res = second_chance(page_frames, page, vec![]);
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn second_chance_oldest_page_referenced_should_replace_second_oldest() {
+        let page_frames = vec![
+            MemoryPage::new(0).referenced(),
+            MemoryPage::new(1),
+            MemoryPage::new(2),
+        ];
+        let page = MemoryPage::new(3);
+        let expected = vec![MemoryPage::new(2), MemoryPage::new(0), MemoryPage::new(3)];
+        let res = second_chance(page_frames, page, vec![]);
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn second_chance_two_oldest_pages_referenced_should_replace_third_oldest() {
+        let page_frames = vec![
+            MemoryPage::new(0).referenced(),
+            MemoryPage::new(1).referenced(),
+            MemoryPage::new(2),
+        ];
+        let page = MemoryPage::new(3);
+        let expected = vec![MemoryPage::new(0), MemoryPage::new(1), MemoryPage::new(3)];
+        let res = second_chance(page_frames, page, vec![]);
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn second_chance_all_pages_referenced_should_resort_to_replace_oldest() {
+        let page_frames = vec![
+            MemoryPage::new(0).referenced(),
+            MemoryPage::new(1).referenced(),
+            MemoryPage::new(2).referenced(),
+        ];
+        let page = MemoryPage::new(3);
+        let expected = vec![MemoryPage::new(1), MemoryPage::new(2), MemoryPage::new(3)];
+        let res = second_chance(page_frames, page, vec![]);
+        assert_eq!(res, expected);
     }
 }
