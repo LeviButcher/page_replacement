@@ -1,13 +1,14 @@
 pub mod algorithms;
 mod utils;
 
-use utils::return_largest;
+use utils::push;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub struct MemoryPage {
     number: u32,
     present: bool,
     referenced: bool,
+    modified: bool
 }
 
 impl MemoryPage {
@@ -16,7 +17,50 @@ impl MemoryPage {
             number,
             present: false,
             referenced: false,
+            modified: false
         }
+    }
+
+    fn referenced(self) -> MemoryPage {
+        MemoryPage {
+            number: self.number,
+            present: self.present,
+            referenced: true,
+            modified: false
+        }
+    }
+
+    fn modified(self) -> MemoryPage {
+        MemoryPage {
+            number: self.number,
+            present: self.present,
+            referenced: false,
+            modified: true
+        }
+    }
+
+    fn modified_and_referenced(self) -> MemoryPage{
+        MemoryPage {
+            number: self.number,
+            present: self.present,
+            referenced: true,
+            modified: true
+        }
+    }
+
+    fn clear(self) -> MemoryPage {
+        MemoryPage {
+            number: self.number,
+            present: self.present,
+            referenced: false,
+            modified: false
+        }
+    }
+}
+
+impl PartialEq for MemoryPage {
+    fn eq(&self, rhs: &MemoryPage) -> bool {
+        self.number == rhs.number
     }
 }
 
@@ -58,31 +102,18 @@ impl PageReport {
     }
 }
 
-// Constructs a list of pages for 0 to page_size
-fn generate_pages(page_size: u32) -> Vec<MemoryPage> {
-    // Right side is exclusive
-    (0..page_size + 1)
-        .collect::<Vec<u32>>()
-        .iter()
-        .map(|i| MemoryPage::new(*i))
-        .collect()
-}
-
 pub fn page_report<F>(handle_loading: F, page_hit_order: Vec<u32>, frame_size: u32) -> PageReport
 where
-    F: Fn(Vec<MemoryPage>, MemoryPage, Vec<u32>) -> u32,
+    F: Fn(Vec<MemoryPage>, MemoryPage, Vec<u32>) -> Vec<MemoryPage>,
 {
     let page_report = PageReport::new();
-    let highest_page_number = page_hit_order.iter().fold(0, return_largest);
     let page_frames = Vec::<MemoryPage>::new();
-    let page_table = generate_pages(highest_page_number);
     let past_pages = Vec::<u32>::new();
 
     page_report_recursion(
         page_hit_order,
         page_frames,
         page_report,
-        page_table,
         frame_size,
         handle_loading,
         past_pages,
@@ -91,15 +122,14 @@ where
 
 fn page_report_recursion<F>(
     page_hit_order: Vec<u32>,
-    mut page_frames: Vec<MemoryPage>,
+    page_frames: Vec<MemoryPage>,
     page_report: PageReport,
-    page_table: Vec<MemoryPage>,
     frame_size: u32,
     handle_loading: F,
-    mut past_pages: Vec<u32>,
+    past_pages: Vec<u32>,
 ) -> PageReport
 where
-    F: Fn(Vec<MemoryPage>, MemoryPage, Vec<u32>) -> u32,
+    F: Fn(Vec<MemoryPage>, MemoryPage, Vec<u32>) -> Vec<MemoryPage>,
 {
     let page_number = page_hit_order.as_slice().split_first();
 
@@ -107,57 +137,52 @@ where
         None => return page_report,
         Some((page_number, page_hit_order)) => {
             let page_hit_order = page_hit_order.to_vec();
-            let page = page_table
-                .iter()
-                .find(|x| x.number == *page_number)
-                .unwrap();
+            let page = MemoryPage::new(*page_number);
 
             // Page is in Memory
-            if page_frames.contains(page) {
-                past_pages.push(*page_number);
+            if page_frames.contains(&page) {
+                let page_frames = page_frames
+                    .iter()
+                    .map(|x| {
+                        if x.number == *page_number {
+                            return x.referenced();
+                        }
+                        *x
+                    })
+                    .collect();
+
                 return page_report_recursion(
                     page_hit_order,
                     page_frames,
                     page_report.hit(),
-                    page_table,
                     frame_size,
                     handle_loading,
-                    past_pages,
+                    push(past_pages, *page_number),
                 );
             }
 
             // Room to load page in memory
             if (page_frames.len() as u32) < frame_size {
-                page_frames.push(*page);
-                past_pages.push(*page_number);
                 return page_report_recursion(
                     page_hit_order,
-                    page_frames,
+                    push(page_frames, page),
                     page_report.fault(),
-                    page_table,
                     frame_size,
                     handle_loading,
-                    past_pages,
+                    push(past_pages, *page_number),
                 );
             }
 
             // No Room, Call algorithm to add to page_frames
-            let replace_page_number =
-                handle_loading(page_frames.clone(), *page, past_pages.clone());
-            let mut page_frames = page_frames
-                .into_iter()
-                .filter(|x| x.number != replace_page_number)
-                .collect::<Vec<MemoryPage>>();
-            page_frames.push(*page);
-            past_pages.push(*page_number);
+            let page_frames = handle_loading(page_frames, page, past_pages.clone());
+
             return page_report_recursion(
                 page_hit_order,
                 page_frames,
                 page_report.fault().removed(),
-                page_table,
                 frame_size,
                 handle_loading,
-                past_pages,
+                push(past_pages, *page_number),
             );
         }
     }
@@ -229,6 +254,19 @@ mod tests {
         };
         let frame_size = 4;
         let res = page_report(algorithms::lru, page_hit_order, frame_size);
+        assert_eq!(res, expected_page_report);
+    }
+
+    #[test]
+    fn page_report_second_chance_should_return_expected() {
+        let page_hit_order = vec![0, 4, 1, 4, 2, 4, 3, 4, 2, 4, 0];
+        let expected_page_report = PageReport {
+            hits: 5,
+            faults: 6,
+            removed: 3,
+        };
+        let frame_size = 3;
+        let res = page_report(algorithms::second_chance, page_hit_order, frame_size);
         assert_eq!(res, expected_page_report);
     }
 }
