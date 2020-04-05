@@ -8,6 +8,7 @@ pub struct MemoryPage {
     number: u32,
     present: bool,
     referenced: bool,
+    modified: bool
 }
 
 impl MemoryPage {
@@ -16,6 +17,7 @@ impl MemoryPage {
             number,
             present: false,
             referenced: false,
+            modified: false
         }
     }
 
@@ -24,6 +26,25 @@ impl MemoryPage {
             number: self.number,
             present: self.present,
             referenced: true,
+            modified: false
+        }
+    }
+
+    fn modified(self) -> MemoryPage {
+        MemoryPage {
+            number: self.number,
+            present: self.present,
+            referenced: false,
+            modified: true
+        }
+    }
+
+    fn modified_and_referenced(self) -> MemoryPage{
+        MemoryPage {
+            number: self.number,
+            present: self.present,
+            referenced: true,
+            modified: true
         }
     }
 
@@ -32,6 +53,7 @@ impl MemoryPage {
             number: self.number,
             present: self.present,
             referenced: false,
+            modified: false
         }
     }
 }

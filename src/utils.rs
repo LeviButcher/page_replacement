@@ -15,3 +15,8 @@ pub fn push<T>(mut acc: Vec<T>, a: T) -> Vec<T> {
     acc.push(a);
     acc
 }
+
+pub fn remove<T>(mut acc: Vec<T>, index: usize) -> (T, Vec<T>) {
+    let t = acc.remove(index);
+    (t, acc)
+}

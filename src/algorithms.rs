@@ -1,5 +1,6 @@
 use crate::*;
-use utils::{add_if_not_found, push, remove_first};
+use utils::{add_if_not_found, push, remove_first, remove};
+use rand::prelude::*;
 
 /// First In First Out Algorithm
 /// page_frames is the currently loaded pages in memory
@@ -48,6 +49,78 @@ pub fn lru(
         .filter(|x| x.number != replace_page_number)
         .collect::<Vec<MemoryPage>>();
     push(page_frames, page)
+}
+
+pub fn nru(page_frames: Vec<MemoryPage>, page: MemoryPage,
+    mut _past_pages: Vec<u32>) -> Vec<MemoryPage>
+{
+    // filter page_frames by case 0
+    // if non_empty -> remove random page from filter, then remove that page from page_frames, then add page
+    // filter page_Frames by case 1
+    // if non_empty -> remove random page, add page
+
+    //let length = page_frames.len();
+    let mut rng = thread_rng();
+
+    let case0 = page_frames.clone().into_iter()
+    .filter(|x| x.referenced == false && x.modified == false)
+    .collect::<Vec<MemoryPage>>();
+
+    let case1 = page_frames.clone().into_iter()
+    .filter(|x| x.referenced == false && x.modified == true)
+    .collect::<Vec<MemoryPage>>();
+
+    let case2 = page_frames.clone().into_iter()
+    .filter(|x| x.referenced == true && x.modified == false)
+    .collect::<Vec<MemoryPage>>();
+
+    let case3 = page_frames.clone().into_iter()
+    .filter(|x| x.referenced == true && x.modified == true)
+    .collect::<Vec<MemoryPage>>();
+
+    if !case0.is_empty() {
+        let length = case0.len();
+        let index = rng.gen_range(0, length);
+        let (remove_page, _) = remove(case0, index);
+        let page_frames = page_frames.into_iter()
+        .filter(|x| *x != remove_page)
+        .collect();
+        return push(page_frames, page);
+    }
+
+    if !case1.is_empty()
+    {
+        let length = case1.len();
+        let index = rng.gen_range(0, length);
+        let (remove_page, _) = remove(case1, index);
+        let page_frames = page_frames.into_iter()
+        .filter(|x| *x != remove_page)
+        .collect::<Vec<MemoryPage>>();
+        return push(page_frames, page);
+    }
+
+    if !case2.is_empty()
+    {
+        let length = case2.len();
+        let index = rng.gen_range(0, length);
+        let (remove_page, _) = remove(case2, index);
+        let page_frames = page_frames.into_iter()
+        .filter(|x| *x != remove_page)
+        .collect::<Vec<MemoryPage>>();
+        return push(page_frames, page);
+    }
+
+    if !case3.is_empty() {
+        let length = case3.len();
+        let index = rng.gen_range(0, length);
+        let (remove_page, _) = remove(case3, index);
+        let page_frames = page_frames.into_iter()
+        .filter(|x| *x != remove_page)
+        .collect::<Vec<MemoryPage>>();
+        return push(page_frames, page);
+    }
+
+    page_frames
 }
 
 /// Second Chance Algorithm
@@ -165,6 +238,47 @@ mod test {
         let page = MemoryPage::new(3);
         let expected = vec![MemoryPage::new(1), MemoryPage::new(2), MemoryPage::new(3)];
         let res = second_chance(page_frames, page, vec![]);
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn nru_should_remove_nonmodified_nonreferenced() {
+        let page_frames = vec![
+            MemoryPage::new(4).referenced(),
+            MemoryPage::new(2).modified_and_referenced(),
+            MemoryPage::new(1).modified(),
+            MemoryPage::new(0)
+        ];
+
+        let page = MemoryPage::new(6).referenced();
+        let expected = vec![MemoryPage::new(4),MemoryPage::new(2), MemoryPage::new(1), MemoryPage::new(6)];
+        let res = nru(page_frames, page, vec![]);
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn nru_should_remove_modified_and_nonreferenced(){
+        let page_frames = vec![
+            MemoryPage::new(8).referenced(),
+            MemoryPage::new(9).modified_and_referenced(),
+            MemoryPage::new(1).modified()
+        ];
+        let page = MemoryPage::new(3).referenced();
+        let expected = vec![MemoryPage::new(8), MemoryPage::new(9), MemoryPage::new(3)];
+        let res = nru(page_frames, page, vec![]);
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn nru_should_remove_referenced(){
+        let page_frames = vec![
+            MemoryPage::new(9).modified_and_referenced(),
+            MemoryPage::new(1).modified_and_referenced(),
+            MemoryPage::new(8).referenced()
+        ];
+        let page = MemoryPage::new(4).modified_and_referenced();
+        let expected = vec![MemoryPage::new(9), MemoryPage::new(1), MemoryPage::new(4)];
+        let res = nru(page_frames, page, vec![]);
         assert_eq!(res, expected);
     }
 }
