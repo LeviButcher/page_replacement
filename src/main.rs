@@ -5,12 +5,10 @@ use rand::prelude::*;
 
 fn main() {
     let mut rng = rand::thread_rng();
-    let mut vec = Vec::new();
-     for x in 0..100
-    {
-        vec.insert(x, rng.gen_range(0, 20));
+    let mut page_hit_order = Vec::new();
+    for x in 0..100 {
+        page_hit_order.insert(x, rng.gen_range(0, 20));
     }
-    println!("{:?}", vec);
     let algorithms: Vec<(
         &str,
         fn(Vec<MemoryPage>, MemoryPage, Vec<u32>) -> Vec<MemoryPage>,
@@ -18,9 +16,10 @@ fn main() {
         ("Fifo", algorithms::fifo),
         ("Second Chance", algorithms::second_chance),
         ("Least Recently Use", algorithms::lru),
+        ("Not Recently Use", algorithms::nru),
+        ("Clock", algorithms::clock),
     ];
     let buffer_sizes = vec![3, 5, 10];
-    let page_hit_order = vec![1, 2, 4, 2, 1, 5, 4];
 
     let algorithms_result = algorithms
         .into_iter()
