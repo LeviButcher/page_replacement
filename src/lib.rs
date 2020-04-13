@@ -107,7 +107,7 @@ impl fmt::Display for PageReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "| hits: {} | faults: {} | removed: {}",
+            "| hits: {} | faults: {} | removed: {} |",
             self.hits, self.faults, self.removed
         )
     }

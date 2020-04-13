@@ -36,15 +36,15 @@ fn main() {
                             (frame, report, utils::push(past, *x))
                         },
                     );
-                    (name, page_report)
+                    (name, page_report, *frame_size)
                 })
-                .collect::<Vec<(&str, PageReport)>>()
+                .collect::<Vec<(&str, PageReport, u32)>>()
         })
-        .collect::<Vec<(&str, PageReport)>>();
+        .collect::<Vec<(&str, PageReport, u32)>>();
 
     println!("Ran With: {:?}", page_hit_order);
 
-    for (name, report) in algorithms_result {
-        println!("| {} {}", name, report);
+    for (name, report, frame_size) in algorithms_result {
+        println!("| {} | frame_size: {} {}", name, frame_size, report);
     }
 }
