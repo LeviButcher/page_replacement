@@ -51,6 +51,30 @@ pub fn lru(
     push(page_frames, page)
 }
 
+pub fn clock(page_frames: Vec<MemoryPage>, page: MemoryPage ,mut _past_pages: Vec<u32>)
+{
+    let mut clock_hand = 0;
+
+    for x in page_frames.clone().iter_mut()
+    {
+        if x.referenced == false
+        {
+            push(remove_first(page_frames.clone()), page);
+            clock_hand += 1;
+        }
+        if x.referenced == true
+        {
+            x.clear();
+            clock_hand += 1;
+        }
+
+        if clock_hand == page_frames.len() - 1
+        {
+            clock_hand = clock_hand % page_frames.len();
+        }
+    }
+}
+
 pub fn nru(page_frames: Vec<MemoryPage>, page: MemoryPage,
     mut _past_pages: Vec<u32>) -> Vec<MemoryPage>
 {
@@ -122,6 +146,7 @@ pub fn nru(page_frames: Vec<MemoryPage>, page: MemoryPage,
 
     page_frames
 }
+
 
 /// Second Chance Algorithm
 /// Exactly like FIFO and that it starts to replace the oldest page
