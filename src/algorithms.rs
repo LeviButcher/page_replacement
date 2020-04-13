@@ -51,17 +51,31 @@ pub fn lru(
     push(page_frames, page)
 }
 
-pub fn clock(page_frames: Vec<MemoryPage>, page: MemoryPage ,mut _past_pages: Vec<u32>)
+pub fn clock(page_frames: Vec<MemoryPage>, page: MemoryPage ,mut _past_pages: Vec<u32>) -> Vec<MemoryPage>
 {
     let mut clock_hand = 0;
+
+
+    /*let replacement_page = page_frames.clone().into_iter()
+    .filter(|x | x.referenced == false)
+    .collect::<Vec<MemoryPage>>();
+
+
+    let page_frames = page_frames.clone()
+    .into_iter()
+    .filter(|x| x.referenced != replacement_page.get(clock_hand).unwrap().referenced)
+    .collect::<Vec<MemoryPage>>();
+    clock_hand += 1;
+
+    return push(remove_first(page_frames), page);*/
 
     for x in page_frames.clone().iter_mut()
     {
         if x.referenced == false
         {
-            push(remove_first(page_frames.clone()), page);
-            clock_hand += 1;
+            return push(remove_first(page_frames.clone()), page);
         }
+        clock_hand += 1;
         if x.referenced == true
         {
             x.clear();
@@ -73,6 +87,8 @@ pub fn clock(page_frames: Vec<MemoryPage>, page: MemoryPage ,mut _past_pages: Ve
             clock_hand = clock_hand % page_frames.len();
         }
     }
+
+    page_frames
 }
 
 pub fn nru(page_frames: Vec<MemoryPage>, page: MemoryPage,
